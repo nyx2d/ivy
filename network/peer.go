@@ -81,13 +81,11 @@ func (p *Peer) Handle() {
 
 func (p *Peer) heartbeat() <-chan error {
 	errC := make(chan error)
-
 	go func() {
 		for {
 			r := rpc.RPCMessage{RPCRequest: &rpc.RPCRequest{HeartbeatRPCRequest: &rpc.HeartbeatRPCRequest{
 				Message: fmt.Sprintf("heartbeat from %s", p.Conn.LocalAddr().String()),
 			}}}
-
 			b, err := r.Encode()
 			if err != nil {
 				errC <- err
@@ -103,7 +101,6 @@ func (p *Peer) heartbeat() <-chan error {
 			time.Sleep(15 * time.Second)
 		}
 	}()
-
 	return errC
 }
 
