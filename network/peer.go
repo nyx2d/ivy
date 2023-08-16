@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	cbor "github.com/fxamacker/cbor/v2"
+	"github.com/nyx2d/ivy/rpc"
 )
 
 type Peer struct {
@@ -67,7 +67,14 @@ func (p *Peer) Handle() {
 			log.Fatal(err)
 
 		case in := <-readC:
-			log.Println(in)
+			m, err := rpc.Decode(in)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if m.RPCRequest != nil && m.RPCRequest.HeartbeatRPCRequest != nil {
+				log.Println(m.RPCRequest.HeartbeatRPCRequest.Message)
+			}
 		}
 	}
 }
@@ -77,7 +84,11 @@ func (p *Peer) heartbeat() <-chan error {
 
 	go func() {
 		for {
-			b, err := cbor.Marshal(fmt.Sprintf("heartbeat from %s", p.Conn.LocalAddr().String()))
+			r := rpc.RPCMessage{RPCRequest: &rpc.RPCRequest{HeartbeatRPCRequest: &rpc.HeartbeatRPCRequest{
+				Message: fmt.Sprintf("heartbeat from %s", p.Conn.LocalAddr().String()),
+			}}}
+
+			b, err := r.Encode()
 			if err != nil {
 				errC <- err
 				return
