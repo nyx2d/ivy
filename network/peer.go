@@ -83,13 +83,7 @@ func (p *Peer) heartbeat() <-chan error {
 				return
 			}
 
-			err = binary.Write(p.Conn, binary.LittleEndian, uint64(len(b)))
-			if err != nil {
-				errC <- err
-				return
-			}
-
-			_, err = p.Conn.Write(b)
+			err = p.sendMessage(b)
 			if err != nil {
 				errC <- err
 				return
@@ -102,37 +96,45 @@ func (p *Peer) heartbeat() <-chan error {
 	return errC
 }
 
-func (p *Peer) read() (<-chan string, <-chan error) {
-	c := make(chan string)
+func (p *Peer) read() (<-chan []byte, <-chan error) {
+	c := make(chan []byte)
 	errC := make(chan error)
-
 	go func() {
 		for {
-			sizeBuf := make([]byte, 8)
-			_, err := io.ReadFull(p.Conn, sizeBuf)
+			msg, err := p.readMessage()
 			if err != nil {
 				errC <- err
 				return
 			}
-			size := binary.LittleEndian.Uint64(sizeBuf)
-
-			readBuf := make([]byte, size)
-			_, err = io.ReadFull(p.Conn, readBuf)
-			if err != nil {
-				errC <- err
-				return
-			}
-
-			var val string
-			err = cbor.Unmarshal(readBuf, &val)
-			if err != nil {
-				errC <- err
-				return
-			}
-
-			c <- val
+			c <- msg
 		}
 	}()
-
 	return c, errC
+}
+
+func (p *Peer) sendMessage(m []byte) error {
+	err := binary.Write(p.Conn, binary.LittleEndian, uint64(len(m)))
+	if err != nil {
+		return err
+	}
+	_, err = p.Conn.Write(m)
+	return err
+}
+
+// blocks until read
+func (p *Peer) readMessage() ([]byte, error) {
+	sizeBuf := make([]byte, 8)
+	_, err := io.ReadFull(p.Conn, sizeBuf)
+	if err != nil {
+		return nil, err
+	}
+	size := binary.LittleEndian.Uint64(sizeBuf)
+
+	readBuf := make([]byte, size)
+	_, err = io.ReadFull(p.Conn, readBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	return readBuf, nil
 }
