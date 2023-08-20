@@ -26,5 +26,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	network.FindPeers(peerID)
+	network.FindPeers(peerID, privateKey)
 }

@@ -1,14 +1,11 @@
 package network
 
 import (
+	"crypto/ed25519"
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net"
-	"syscall"
-	"time"
 
 	"github.com/nyx2d/ivy/rpc"
 )
@@ -47,23 +44,20 @@ func NewServerPeer(peerID string, a net.Addr) (*Peer, error) {
 	return p, nil
 }
 
-func (p *Peer) Handle() {
+func (p *Peer) Handle(peerID string, privateKey ed25519.PrivateKey) {
 	defer p.Conn.Close()
 	defer connManager.Remove(p.Conn)
+	defer peerManager.Remove(p)
+
+	if !p.isClient {
+		p.sendHandshake(peerID, privateKey) // we are the client, let the server know who we are
+	}
 
 	readC, readErrC := p.read()
-	heartbeatErrC := p.heartbeat()
 	for {
 		select {
 		case err := <-readErrC:
 			if err == io.EOF {
-				log.Printf("peer closed connection %s\n", p.Conn.RemoteAddr().String())
-				return
-			}
-			log.Fatal(err)
-
-		case err := <-heartbeatErrC:
-			if errors.Is(err, syscall.EPIPE) {
 				log.Printf("peer closed connection %s\n", p.Conn.RemoteAddr().String())
 				return
 			}
@@ -75,36 +69,24 @@ func (p *Peer) Handle() {
 				log.Fatal(err)
 			}
 
-			if m.RPCRequest != nil && m.RPCRequest.HeartbeatRPCRequest != nil {
-				log.Println(m.RPCRequest.HeartbeatRPCRequest.Message)
+			if m.Handshake != nil {
+				// TODO: validate sig, set pubkey
+				p.ID = m.Handshake.PeerID
+				peerManager.Add(p)
 			}
 		}
 	}
 }
 
-func (p *Peer) heartbeat() <-chan error {
-	errC := make(chan error)
-	go func() {
-		for {
-			r := rpc.RPCMessage{RPCRequest: &rpc.RPCRequest{HeartbeatRPCRequest: &rpc.HeartbeatRPCRequest{
-				Message: fmt.Sprintf("heartbeat from %s", p.Conn.LocalAddr().String()),
-			}}}
-			b, err := r.Encode()
-			if err != nil {
-				errC <- err
-				return
-			}
-
-			err = p.sendMessage(b)
-			if err != nil {
-				errC <- err
-				return
-			}
-
-			time.Sleep(15 * time.Second)
-		}
-	}()
-	return errC
+func (p *Peer) sendHandshake(peerID string, privateKey ed25519.PrivateKey) error {
+	r := rpc.RPCMessage{Handshake: &rpc.Handshake{
+		PeerID: peerID,
+	}}
+	b, err := r.Encode()
+	if err != nil {
+		return err
+	}
+	return p.sendMessage(b)
 }
 
 func (p *Peer) read() (<-chan []byte, <-chan error) {

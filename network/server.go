@@ -31,7 +31,7 @@ func Serve(peerID string, privateKey ed25519.PrivateKey) (int, error) {
 					log.Fatal(err)
 				}
 
-				peer.Handle()
+				peer.Handle(peerID, privateKey)
 			}()
 		}
 	}()

@@ -7,19 +7,17 @@ type RPCMessage struct {
 	Error     bool
 	End       bool
 
-	*RPCRequest
-	*RPCResponse
+	*Handshake
 }
 
-type RPCRequest struct {
-	*HeartbeatRPCRequest
-}
-
-type HeartbeatRPCRequest struct {
+type Heartbeat struct {
 	Message string
 }
 
-type RPCResponse struct {
+type Handshake struct {
+	PeerID    string
+	PublicKey []byte
+	Signature []byte
 }
 
 func (m RPCMessage) Encode() ([]byte, error) {

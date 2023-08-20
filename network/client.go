@@ -1,6 +1,7 @@
 package network
 
 import (
+	"crypto/ed25519"
 	"log"
 	"net"
 	"time"
@@ -14,7 +15,7 @@ const scanPeriod = 10
 const scanTimeout = 2 * time.Second
 const scanBufferSize = 256
 
-func FindPeers(peerID string) {
+func FindPeers(peerID string, privateKey ed25519.PrivateKey) {
 	ticker := time.NewTicker(scanPeriod)
 	for ; true; <-ticker.C {
 		entriesChan := make(chan *mdns.ServiceEntry, scanBufferSize)
@@ -52,7 +53,7 @@ func FindPeers(peerID string) {
 						log.Printf("error connecting to peer: %s\n", err)
 						return
 					}
-					peer.Handle()
+					peer.Handle(peerID, privateKey)
 				}()
 			}
 		}
