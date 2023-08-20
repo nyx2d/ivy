@@ -17,40 +17,43 @@ type Peer struct {
 	isClient bool // if this peer is a client of ours
 }
 
-// NewPeer takes in an established peer connection with us as the server
-func NewClientPeer(c net.Conn) (*Peer, error) {
-	connManager.Add(c) // we only add clients to the peerManager once they've send us their pubkey
+// HandleClient takes in an established connection with us as the server
+func (m *Manager) HandleClient(c net.Conn) error {
+	m.addConn(c) // we only add clients to the peers set once they've sent us their pubkey
 	log.Printf("got connection from client at %s\n", c.RemoteAddr().String())
 
-	return &Peer{
-		Conn: c,
-
+	p := &Peer{
+		Conn:     c,
 		isClient: true,
-	}, nil
+	}
+
+	go m.HandlePeer(p)
+	return nil
 }
 
-// / NewServerPeer establishes a connection to a new peer with us as the client
-func NewServerPeer(peerID string, a net.Addr) (*Peer, error) {
+// ConnectToServer establishes a connection to a new peer with us as the client
+func (m *Manager) ConnectToServer(peerID string, a net.Addr) error {
 	conn, err := net.Dial(a.Network(), a.String())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	p := &Peer{ID: peerID, Conn: conn}
-	connManager.Add(conn)
-	peerManager.Add(p)
+	m.addConn(conn)
+	m.addPeer(p)
 	log.Printf("established connection to server at %s\n", conn.RemoteAddr().String())
 
-	return p, nil
+	go m.HandlePeer(p)
+	return nil
 }
 
-func (p *Peer) Handle(peerID string, privateKey ed25519.PrivateKey) {
+func (m *Manager) HandlePeer(p *Peer) {
 	defer p.Conn.Close()
-	defer connManager.Remove(p.Conn)
-	defer peerManager.Remove(p)
+	defer m.removeConn(p.Conn)
+	defer m.removePeer(p)
 
 	if !p.isClient {
-		p.sendHandshake(peerID, privateKey) // we are the client, let the server know who we are
+		p.sendHandshake(m.peerID, m.privateKey) // we are the client, let the server know who we are
 	}
 
 	readC, readErrC := p.read()
@@ -64,15 +67,15 @@ func (p *Peer) Handle(peerID string, privateKey ed25519.PrivateKey) {
 			log.Fatal(err)
 
 		case in := <-readC:
-			m, err := rpc.Decode(in)
+			msg, err := rpc.Decode(in)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			if m.Handshake != nil {
+			if msg.Handshake != nil {
 				// TODO: validate sig, set pubkey
-				p.ID = m.Handshake.PeerID
-				peerManager.Add(p)
+				p.ID = msg.Handshake.PeerID
+				m.addPeer(p)
 			}
 		}
 	}

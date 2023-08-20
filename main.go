@@ -3,28 +3,25 @@ package main
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/base64"
 	"log"
 
 	"github.com/nyx2d/ivy/network"
 )
 
 func main() {
-	pubKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		log.Fatal(err)
-	}
-	peerID := base64.StdEncoding.EncodeToString(pubKey)
+	// TODO: check for file first, command line args, etc
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 
-	port, err := network.Serve(peerID, privateKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = network.Broadcast(peerID, port)
+	network := network.NewManager(privateKey)
+	err = network.Serve()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	network.FindPeers(peerID, privateKey)
+	err = network.Broadcast()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	network.FindPeers()
 }

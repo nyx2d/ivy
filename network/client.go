@@ -1,7 +1,6 @@
 package network
 
 import (
-	"crypto/ed25519"
 	"log"
 	"net"
 	"time"
@@ -15,7 +14,7 @@ const scanPeriod = 10
 const scanTimeout = 2 * time.Second
 const scanBufferSize = 256
 
-func FindPeers(peerID string, privateKey ed25519.PrivateKey) {
+func (m *Manager) FindPeers() {
 	ticker := time.NewTicker(scanPeriod)
 	for ; true; <-ticker.C {
 		entriesChan := make(chan *mdns.ServiceEntry, scanBufferSize)
@@ -40,20 +39,19 @@ func FindPeers(peerID string, privateKey ed25519.PrivateKey) {
 			if len(entry.InfoFields) < 2 || entry.InfoFields[0] != serviceName {
 				continue // not a node, extra guard against bad mDNS DNS-SD behavior (looking at you roku)
 			}
-			entryPeerID := entry.InfoFields[1]
-			if entryPeerID == peerID {
+			peerID := entry.InfoFields[1]
+			if peerID == m.peerID {
 				continue // skip self
 			}
 
 			addr := &net.TCPAddr{IP: entry.AddrV4, Port: entry.Port}
-			if !connManager.Active(addr) && !peerManager.Active(entryPeerID) {
+			if !m.connActive(addr) && !m.peerActive(peerID) {
 				go func() {
-					peer, err := NewServerPeer(entryPeerID, addr)
+					err := m.ConnectToServer(peerID, addr)
 					if err != nil {
 						log.Printf("error connecting to peer: %s\n", err)
 						return
 					}
-					peer.Handle(peerID, privateKey)
 				}()
 			}
 		}

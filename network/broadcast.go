@@ -8,8 +8,8 @@ import (
 
 const serviceName = "ivy"
 
-func Broadcast(peerID string, servicePort int) error {
-	service, err := mdns.NewMDNSService(peerID, serviceName, "", "", servicePort, nil, []string{serviceName, peerID})
+func (m *Manager) Broadcast() error {
+	service, err := mdns.NewMDNSService(m.peerID, serviceName, "", "", m.serverAddr.Port, nil, []string{serviceName, m.peerID})
 	if err != nil {
 		return err
 	}
@@ -21,6 +21,6 @@ func Broadcast(peerID string, servicePort int) error {
 	}
 	_ = server // TODO: figure out server shutdown
 
-	log.Printf("broadcasting as peer %s\n", peerID)
+	log.Printf("broadcasting as peer %s\n", m.peerID)
 	return nil
 }
