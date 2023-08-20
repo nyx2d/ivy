@@ -34,7 +34,7 @@ func (m *Manager) ConnectToServer(peerID string, a net.Addr) error {
 		return err
 	}
 
-	p := &Peer{ID: peerID, Conn: conn}
+	p := &Peer{ID: peerID, Conn: conn, isClient: false}
 	go m.HandlePeer(p)
 	return nil
 }
@@ -76,16 +76,18 @@ func (m *Manager) HandlePeer(p *Peer) {
 				log.Fatal(err)
 			}
 
+			log.Printf("🔗 message %v from %s (%s)\n", msg, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+
 			if msg.Handshake != nil {
 				// TODO: validate sig, set pubkey
 				p.ID = msg.Handshake.PeerID
 				log.Printf("📨 got handshake from %s, %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
 
-				// if m.peerActive(p.ID) {
-				// 	// already have peer, drop them
-				// 	log.Printf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
-				// 	return
-				// }
+				if m.peerActive(p.ID) {
+					// already have peer, drop them
+					log.Printf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
+					return
+				}
 
 				err := m.addPeer(p)
 				if err != nil {

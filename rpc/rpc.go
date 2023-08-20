@@ -8,10 +8,14 @@ type RPCMessage struct {
 	End       bool
 
 	*Handshake
+	*Close
 }
 
 type Heartbeat struct {
 	Message string
+}
+
+type Close struct {
 }
 
 type Handshake struct {

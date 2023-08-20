@@ -91,8 +91,8 @@ func (m *Manager) PeerDisplayLoop() {
 	for range ticker.C {
 		m.peerMutex.Lock()
 		log.Println("===")
-		for _, p := range m.peers {
-			log.Printf("👋 peer %s at %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+		for peerID, p := range m.peers {
+			log.Printf("👋 peer %s at %s (%s)\n", peerID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
 		}
 		log.Println("===")
 		m.peerMutex.Unlock()
