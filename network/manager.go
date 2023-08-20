@@ -4,10 +4,11 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
-	"log"
 	"net"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Manager struct {
@@ -61,11 +62,11 @@ func (m *Manager) addPeer(peer *Peer) error {
 	m.peerMutex.Lock()
 	defer m.peerMutex.Unlock()
 	if _, ok := m.peers[peer.ID]; ok {
-		log.Printf("⛔ peer already exists %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
+		log.Errorf("⛔ peer already exists %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
 		return errors.New("peer already exists")
 	}
 	m.peers[peer.ID] = peer
-	log.Printf("🤝 added peer %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
+	log.Infof("🤝 added peer %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
 	return nil
 }
 
@@ -83,18 +84,18 @@ func (m *Manager) removePeer(peer *Peer) {
 		return // just for logging sake
 	}
 	delete(m.peers, peer.ID)
-	log.Printf("👋 removed peer %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
+	log.Infof("👋 removed peer %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
 }
 
 func (m *Manager) PeerDisplayLoop() {
 	ticker := time.NewTicker(15 * time.Second)
 	for range ticker.C {
 		m.peerMutex.Lock()
-		log.Println("===")
+		log.Info("===")
 		for peerID, p := range m.peers {
-			log.Printf("👋 peer %s at %s (%s)\n", peerID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+			log.Infof("👋 peer %s at %s (%s)\n", peerID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
 		}
-		log.Println("===")
+		log.Info("===")
 		m.peerMutex.Unlock()
 	}
 }

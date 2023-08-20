@@ -1,13 +1,13 @@
 package network
 
 import (
-	"log"
 	"net"
 	"time"
 
 	"github.com/hashicorp/mdns"
 	"github.com/samber/lo"
 	_ "github.com/samber/lo"
+	log "github.com/sirupsen/logrus"
 )
 
 const scanPeriod = 10
@@ -31,7 +31,7 @@ func (m *Manager) FindPeers() {
 
 		entries, _, _, ok := lo.BufferWithTimeout(entriesChan, scanBufferSize, scanTimeout)
 		if !ok {
-			log.Println("⛔ issue with buffer timeout")
+			log.Error("⛔ issue with buffer timeout")
 			continue
 		}
 
@@ -46,11 +46,11 @@ func (m *Manager) FindPeers() {
 
 			addr := &net.TCPAddr{IP: entry.AddrV4, Port: entry.Port}
 			if !m.connActive(addr) {
-				log.Printf("👀 found peer %s at %s\n", peerID, addr.String())
+				log.Tracef("👀 found peer %s at %s\n", peerID, addr.String())
 				go func() {
 					err := m.ConnectToServer(peerID, addr)
 					if err != nil {
-						log.Printf("⛔ error connecting to peer: %s\n", err)
+						log.Errorf("⛔ error connecting to peer: %s\n", err)
 						return
 					}
 				}()

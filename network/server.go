@@ -1,8 +1,9 @@
 package network
 
 import (
-	"log"
 	"net"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func (m *Manager) Serve() error {
@@ -12,17 +13,17 @@ func (m *Manager) Serve() error {
 	}
 	m.serverAddr = lis.Addr().(*net.TCPAddr)
 
-	log.Printf("👂 server listening at %v", lis.Addr().String())
+	log.Infof("👂 server listening at %v", lis.Addr().String())
 	go func() {
 		for {
 			conn, err := lis.Accept()
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Printf("🔁 new connection from %v", conn.RemoteAddr().String())
+			log.Tracef("🔁 new connection from %v", conn.RemoteAddr().String())
 			go func() {
 				if m.connActive(conn.RemoteAddr()) { // already established, reject peer
-					log.Println("already has peer", conn.RemoteAddr().String())
+					log.Warn("already has peer", conn.RemoteAddr().String())
 					conn.Close()
 					return
 				}

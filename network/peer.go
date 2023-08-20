@@ -4,10 +4,10 @@ import (
 	"crypto/ed25519"
 	"encoding/binary"
 	"io"
-	"log"
 	"net"
 
 	"github.com/nyx2d/ivy/rpc"
+	log "github.com/sirupsen/logrus"
 )
 
 type Peer struct {
@@ -47,14 +47,14 @@ func (m *Manager) HandlePeer(p *Peer) {
 	if !p.isClient {
 		err := m.addPeer(p)
 		if err != nil {
-			log.Printf("⛔ add peer err: %v\n", err)
+			log.Errorf("⛔ add peer err: %v\n", err)
 			return
 		}
 		defer m.removePeer(p)
 
 		err = p.sendHandshake(m.peerID, m.privateKey) // we are the client, let the server know who we are
 		if err != nil {
-			log.Printf("⛔ handshake send err: %v\n", err)
+			log.Errorf("⛔ handshake send err: %v\n", err)
 			return
 		}
 	}
@@ -64,10 +64,10 @@ func (m *Manager) HandlePeer(p *Peer) {
 		select {
 		case err := <-readErrC:
 			if err == io.EOF {
-				log.Printf("⛔ peer closed connection %s (%s)\n", p.Conn.RemoteAddr().String(), p.TypeIndicator())
+				log.Errorf("⛔ peer closed connection %s (%s)\n", p.Conn.RemoteAddr().String(), p.TypeIndicator())
 				return
 			}
-			log.Printf("⛔ read err: %v\n", err)
+			log.Errorf("⛔ read err: %v\n", err)
 			return
 
 		case in := <-readC:
@@ -76,22 +76,22 @@ func (m *Manager) HandlePeer(p *Peer) {
 				log.Fatal(err)
 			}
 
-			log.Printf("🔗 message %v from %s (%s)\n", msg, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+			log.Tracef("🔗 message %v from %s (%s)\n", msg, p.Conn.RemoteAddr().String(), p.TypeIndicator())
 
 			if msg.Handshake != nil {
 				// TODO: validate sig, set pubkey
 				p.ID = msg.Handshake.PeerID
-				log.Printf("📨 got handshake from %s, %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+				log.Tracef("📨 got handshake from %s, %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
 
 				if m.peerActive(p.ID) {
 					// already have peer, drop them
-					log.Printf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
+					log.Errorf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
 					return
 				}
 
 				err := m.addPeer(p)
 				if err != nil {
-					log.Printf("⛔ add peer err: %v\n", err)
+					log.Errorf("⛔ add peer err: %v\n", err)
 					return
 				}
 				defer m.removePeer(p)
@@ -109,7 +109,7 @@ func (p *Peer) sendHandshake(peerID string, privateKey ed25519.PrivateKey) error
 		return err
 	}
 	err = p.sendMessage(b)
-	log.Printf("✉️  sent handshake to %s %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+	log.Tracef("✉️  sent handshake to %s %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
 	return err
 }
 
