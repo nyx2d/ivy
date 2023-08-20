@@ -31,7 +31,7 @@ func (m *Manager) FindPeers() {
 
 		entries, _, _, ok := lo.BufferWithTimeout(entriesChan, scanBufferSize, scanTimeout)
 		if !ok {
-			log.Println("issue with buffer timeout")
+			log.Println("⛔ issue with buffer timeout")
 			continue
 		}
 
@@ -40,16 +40,17 @@ func (m *Manager) FindPeers() {
 				continue // not a node, extra guard against bad mDNS DNS-SD behavior (looking at you roku)
 			}
 			peerID := entry.InfoFields[1]
-			if peerID == m.peerID {
-				continue // skip self
+			if peerID == m.peerID || m.peerActive(peerID) {
+				continue // skip self and active peers
 			}
 
 			addr := &net.TCPAddr{IP: entry.AddrV4, Port: entry.Port}
-			if !m.connActive(addr) && !m.peerActive(peerID) {
+			if !m.connActive(addr) {
+				log.Printf("👀 found peer %s at %s\n", peerID, addr.String())
 				go func() {
 					err := m.ConnectToServer(peerID, addr)
 					if err != nil {
-						log.Printf("error connecting to peer: %s\n", err)
+						log.Printf("⛔ error connecting to peer: %s\n", err)
 						return
 					}
 				}()

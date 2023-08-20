@@ -21,6 +21,6 @@ func (m *Manager) Broadcast() error {
 	}
 	_ = server // TODO: figure out server shutdown
 
-	log.Printf("broadcasting as peer %s\n", m.peerID)
+	log.Printf("📣 broadcasting as peer %s\n", m.peerID)
 	return nil
 }

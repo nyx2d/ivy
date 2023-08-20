@@ -3,8 +3,11 @@ package network
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"errors"
+	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 type Manager struct {
@@ -54,10 +57,16 @@ func (m *Manager) removeConn(conn net.Conn) {
 	delete(m.conns, conn.RemoteAddr().String())
 }
 
-func (m *Manager) addPeer(peer *Peer) {
+func (m *Manager) addPeer(peer *Peer) error {
 	m.peerMutex.Lock()
 	defer m.peerMutex.Unlock()
+	if _, ok := m.peers[peer.ID]; ok {
+		log.Printf("⛔ peer already exists %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
+		return errors.New("peer already exists")
+	}
 	m.peers[peer.ID] = peer
+	log.Printf("🤝 added peer %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
+	return nil
 }
 
 func (m *Manager) peerActive(id string) bool {
@@ -70,5 +79,22 @@ func (m *Manager) peerActive(id string) bool {
 func (m *Manager) removePeer(peer *Peer) {
 	m.peerMutex.Lock()
 	defer m.peerMutex.Unlock()
+	if _, ok := m.peers[peer.ID]; !ok {
+		return // just for logging sake
+	}
 	delete(m.peers, peer.ID)
+	log.Printf("👋 removed peer %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
+}
+
+func (m *Manager) PeerDisplayLoop() {
+	ticker := time.NewTicker(15 * time.Second)
+	for range ticker.C {
+		m.peerMutex.Lock()
+		log.Println("===")
+		for _, p := range m.peers {
+			log.Printf("👋 peer %s at %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+		}
+		log.Println("===")
+		m.peerMutex.Unlock()
+	}
 }

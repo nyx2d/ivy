@@ -19,14 +19,10 @@ type Peer struct {
 
 // HandleClient takes in an established connection with us as the server
 func (m *Manager) HandleClient(c net.Conn) error {
-	m.addConn(c) // we only add clients to the peers set once they've sent us their pubkey
-	log.Printf("got connection from client at %s\n", c.RemoteAddr().String())
-
 	p := &Peer{
 		Conn:     c,
 		isClient: true,
 	}
-
 	go m.HandlePeer(p)
 	return nil
 }
@@ -39,21 +35,28 @@ func (m *Manager) ConnectToServer(peerID string, a net.Addr) error {
 	}
 
 	p := &Peer{ID: peerID, Conn: conn}
-	m.addConn(conn)
-	m.addPeer(p)
-	log.Printf("established connection to server at %s\n", conn.RemoteAddr().String())
-
 	go m.HandlePeer(p)
 	return nil
 }
 
 func (m *Manager) HandlePeer(p *Peer) {
-	defer p.Conn.Close()
+	m.addConn(p.Conn)
 	defer m.removeConn(p.Conn)
-	defer m.removePeer(p)
+	defer p.Conn.Close()
 
 	if !p.isClient {
-		p.sendHandshake(m.peerID, m.privateKey) // we are the client, let the server know who we are
+		err := m.addPeer(p)
+		if err != nil {
+			log.Printf("⛔ add peer err: %v\n", err)
+			return
+		}
+		defer m.removePeer(p)
+
+		err = p.sendHandshake(m.peerID, m.privateKey) // we are the client, let the server know who we are
+		if err != nil {
+			log.Printf("⛔ handshake send err: %v\n", err)
+			return
+		}
 	}
 
 	readC, readErrC := p.read()
@@ -61,10 +64,11 @@ func (m *Manager) HandlePeer(p *Peer) {
 		select {
 		case err := <-readErrC:
 			if err == io.EOF {
-				log.Printf("peer closed connection %s\n", p.Conn.RemoteAddr().String())
+				log.Printf("⛔ peer closed connection %s (%s)\n", p.Conn.RemoteAddr().String(), p.TypeIndicator())
 				return
 			}
-			log.Fatal(err)
+			log.Printf("⛔ read err: %v\n", err)
+			return
 
 		case in := <-readC:
 			msg, err := rpc.Decode(in)
@@ -75,7 +79,20 @@ func (m *Manager) HandlePeer(p *Peer) {
 			if msg.Handshake != nil {
 				// TODO: validate sig, set pubkey
 				p.ID = msg.Handshake.PeerID
-				m.addPeer(p)
+				log.Printf("📨 got handshake from %s, %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+
+				// if m.peerActive(p.ID) {
+				// 	// already have peer, drop them
+				// 	log.Printf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
+				// 	return
+				// }
+
+				err := m.addPeer(p)
+				if err != nil {
+					log.Printf("⛔ add peer err: %v\n", err)
+					return
+				}
+				defer m.removePeer(p)
 			}
 		}
 	}
@@ -89,7 +106,9 @@ func (p *Peer) sendHandshake(peerID string, privateKey ed25519.PrivateKey) error
 	if err != nil {
 		return err
 	}
-	return p.sendMessage(b)
+	err = p.sendMessage(b)
+	log.Printf("✉️  sent handshake to %s %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+	return err
 }
 
 func (p *Peer) read() (<-chan []byte, <-chan error) {
@@ -133,4 +152,11 @@ func (p *Peer) readMessage() ([]byte, error) {
 	}
 
 	return readBuf, nil
+}
+
+func (p *Peer) TypeIndicator() string {
+	if p.isClient {
+		return "client"
+	}
+	return "server"
 }

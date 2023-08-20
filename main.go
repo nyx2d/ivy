@@ -23,5 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	go network.PeerDisplayLoop()
+
 	network.FindPeers()
 }
