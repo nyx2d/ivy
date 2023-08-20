@@ -39,14 +39,15 @@ func FindPeers(peerID string) {
 			if len(entry.InfoFields) < 2 || entry.InfoFields[0] != serviceName {
 				continue // not a node, extra guard against bad mDNS DNS-SD behavior (looking at you roku)
 			}
-			if entry.InfoFields[1] == peerID {
+			entryPeerID := entry.InfoFields[1]
+			if entryPeerID == peerID {
 				continue // skip self
 			}
 
 			addr := &net.TCPAddr{IP: entry.AddrV4, Port: entry.Port}
-			if entry.Info != peerID && !connManager.Active(addr) {
+			if !connManager.Active(addr) && !peerManager.Active(entryPeerID) {
 				go func() {
-					peer, err := NewServerPeer(addr)
+					peer, err := NewServerPeer(entryPeerID, addr)
 					if err != nil {
 						log.Printf("error connecting to peer: %s\n", err)
 						return

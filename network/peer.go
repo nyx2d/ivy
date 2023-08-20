@@ -14,6 +14,7 @@ import (
 )
 
 type Peer struct {
+	ID   string
 	Conn net.Conn
 
 	isClient bool // if this peer is a client of ours
@@ -21,7 +22,7 @@ type Peer struct {
 
 // NewPeer takes in an established peer connection with us as the server
 func NewClientPeer(c net.Conn) (*Peer, error) {
-	connManager.Add(c)
+	connManager.Add(c) // we only add clients to the peerManager once they've send us their pubkey
 	log.Printf("got connection from client at %s\n", c.RemoteAddr().String())
 
 	return &Peer{
@@ -32,16 +33,18 @@ func NewClientPeer(c net.Conn) (*Peer, error) {
 }
 
 // / NewServerPeer establishes a connection to a new peer with us as the client
-func NewServerPeer(a net.Addr) (*Peer, error) {
+func NewServerPeer(peerID string, a net.Addr) (*Peer, error) {
 	conn, err := net.Dial(a.Network(), a.String())
 	if err != nil {
 		return nil, err
 	}
 
+	p := &Peer{ID: peerID, Conn: conn}
 	connManager.Add(conn)
+	peerManager.Add(p)
 	log.Printf("established connection to server at %s\n", conn.RemoteAddr().String())
 
-	return &Peer{Conn: conn}, nil
+	return p, nil
 }
 
 func (p *Peer) Handle() {

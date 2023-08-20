@@ -27,13 +27,11 @@ func (c *connectionManager) Active(a net.Addr) bool {
 func (c *connectionManager) Add(conn net.Conn) {
 	c.Lock()
 	defer c.Unlock()
-	a := conn.RemoteAddr()
-	c.connections[a.String()] = struct{}{}
+	c.connections[conn.RemoteAddr().String()] = struct{}{}
 }
 
 func (c *connectionManager) Remove(conn net.Conn) {
 	c.Lock()
 	defer c.Unlock()
-	a := conn.RemoteAddr()
-	delete(c.connections, a.String())
+	delete(c.connections, conn.RemoteAddr().String())
 }
