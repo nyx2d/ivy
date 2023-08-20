@@ -1,7 +1,6 @@
 package network
 
 import (
-	"crypto/ed25519"
 	"encoding/binary"
 	"io"
 	"net"
@@ -52,7 +51,7 @@ func (m *Manager) HandlePeer(p *Peer) {
 		}
 		defer m.removePeer(p)
 
-		err = p.sendHandshake(m.peerID, m.privateKey) // we are the client, let the server know who we are
+		err = m.sendHandshake(p) // we are the client, let the server know who we are
 		if err != nil {
 			log.Errorf("⛔ handshake send err: %v\n", err)
 			return
@@ -100,17 +99,19 @@ func (m *Manager) HandlePeer(p *Peer) {
 	}
 }
 
-func (p *Peer) sendHandshake(peerID string, privateKey ed25519.PrivateKey) error {
-	r := rpc.RPCMessage{Handshake: &rpc.Handshake{
-		PeerID: peerID,
-	}}
-	b, err := r.Encode()
+func (m *Manager) sendHandshake(p *Peer) error {
+	b, err := rpc.NewHandshake(m.peerID, m.publicKey, m.privateKey)
 	if err != nil {
 		return err
 	}
-	err = p.sendMessage(b)
-	log.Tracef("✉️  sent handshake to %s %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
-	return err
+	return p.sendMessage(b)
+}
+
+func (p *Peer) TypeIndicator() string {
+	if p.isClient {
+		return "client"
+	}
+	return "server"
 }
 
 func (p *Peer) read() (<-chan []byte, <-chan error) {
@@ -154,11 +155,4 @@ func (p *Peer) readMessage() ([]byte, error) {
 	}
 
 	return readBuf, nil
-}
-
-func (p *Peer) TypeIndicator() string {
-	if p.isClient {
-		return "client"
-	}
-	return "server"
 }
