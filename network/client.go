@@ -48,7 +48,13 @@ func (m *Manager) FindPeers() {
 			if !m.connActive(addr) {
 				log.Tracef("👀 found peer %s at %s\n", peerID, addr.String())
 				go func() {
-					err := m.ConnectToServer(peerID, addr)
+					conn, err := net.Dial(addr.Network(), addr.String())
+					if err != nil {
+						log.Error(err)
+						return
+					}
+
+					err = m.HandleConn(conn, false)
 					if err != nil {
 						log.Errorf("⛔ error connecting to peer: %s\n", err)
 						return

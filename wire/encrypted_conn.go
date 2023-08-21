@@ -10,7 +10,6 @@ import (
 	"net"
 
 	"github.com/nyx2d/ivy/rpc"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
@@ -42,6 +41,10 @@ func NewEncryptedConn(conn net.Conn) (*EncryptedConn, error) {
 	}, nil
 }
 
+func (c *EncryptedConn) PeerID() string {
+	return base64.StdEncoding.EncodeToString(*c.peerPublicSigningKey)
+}
+
 func (c *EncryptedConn) HandshakeAsClient(signingKey ed25519.PrivateKey) error {
 	if err := c.Conn.SendMessage(c.buildHandshakeMessage(signingKey)); err != nil {
 		return err
@@ -61,8 +64,7 @@ func (c *EncryptedConn) HandshakeAsClient(signingKey ed25519.PrivateKey) error {
 		return err
 	}
 
-	// send test message
-	return c.SendMessage(&rpc.RPCMessage{Heartbeat: &rpc.Heartbeat{Message: "hello"}})
+	return nil
 }
 
 func (c *EncryptedConn) HandshakeAsServer(signingKey ed25519.PrivateKey) error {
@@ -84,13 +86,6 @@ func (c *EncryptedConn) HandshakeAsServer(signingKey ed25519.PrivateKey) error {
 	if err != nil {
 		return err
 	}
-
-	// recv test message
-	msg, err := c.ReadMessage()
-	if err != nil {
-		return err
-	}
-	log.Info(msg.Heartbeat.Message)
 
 	return nil
 }
@@ -175,4 +170,21 @@ func (c *EncryptedConn) SendMessage(m *rpc.RPCMessage) error {
 	return c.Conn.SendMessage(&rpc.RPCMessage{Encrypted: &rpc.Encrypted{
 		Payload: encryptedMsg,
 	}})
+}
+
+// ReadMessages continuously reads messages from the connection in a goroutine and returns them on a channel
+func (c *EncryptedConn) ReadMessages() (<-chan *rpc.RPCMessage, <-chan error) {
+	resC := make(chan *rpc.RPCMessage)
+	errC := make(chan error)
+	go func() {
+		for {
+			msg, err := c.ReadMessage()
+			if err != nil {
+				errC <- err
+				return
+			}
+			resC <- msg
+		}
+	}()
+	return resC, errC
 }
