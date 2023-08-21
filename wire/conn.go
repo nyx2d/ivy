@@ -17,7 +17,7 @@ func NewConn(conn net.Conn) *Conn {
 }
 
 // ReadMessage blocks until a full message is read and decodes it into an RPCMessage
-func (c *Conn) ReadMessage() (*rpc.RPCMessage, error) {
+func (c *Conn) ReadMessage() (*rpc.Message, error) {
 	sizeBuf := make([]byte, 8)
 	_, err := io.ReadFull(c.conn, sizeBuf)
 	if err != nil {
@@ -38,7 +38,7 @@ func (c *Conn) ReadMessage() (*rpc.RPCMessage, error) {
 	return &msg, nil
 }
 
-func (c *Conn) SendMessage(m *rpc.RPCMessage) error {
+func (c *Conn) SendMessage(m *rpc.Message) error {
 	data, err := m.Encode()
 	if err != nil {
 		return err

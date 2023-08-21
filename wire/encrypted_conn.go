@@ -90,10 +90,10 @@ func (c *EncryptedConn) HandshakeAsServer(signingKey ed25519.PrivateKey) error {
 	return nil
 }
 
-func (c *EncryptedConn) buildHandshakeMessage(signingKey ed25519.PrivateKey) *rpc.RPCMessage {
+func (c *EncryptedConn) buildHandshakeMessage(signingKey ed25519.PrivateKey) *rpc.Message {
 	peerID := base64.StdEncoding.EncodeToString(signingKey.Public().(ed25519.PublicKey))
 	sig := ed25519.Sign(signingKey, c.transportPublicKey.Bytes())
-	return &rpc.RPCMessage{Handshake: &rpc.Handshake{
+	return &rpc.Message{Handshake: &rpc.Handshake{
 		PeerID:    peerID, // TODO: replace peerID with pubkey directly
 		PublicKey: c.transportPublicKey.Bytes(),
 		Signature: sig,
@@ -101,7 +101,7 @@ func (c *EncryptedConn) buildHandshakeMessage(signingKey ed25519.PrivateKey) *rp
 }
 
 // verifyHandshake mutates the conn to include the peer's public keys
-func (c *EncryptedConn) verifyHandshake(m *rpc.RPCMessage) bool {
+func (c *EncryptedConn) verifyHandshake(m *rpc.Message) bool {
 	if m.Handshake == nil {
 		return false
 	}
@@ -138,7 +138,7 @@ func (c *EncryptedConn) deriveSharedKey() error {
 	return nil
 }
 
-func (c *EncryptedConn) ReadMessage() (*rpc.RPCMessage, error) {
+func (c *EncryptedConn) ReadMessage() (*rpc.Message, error) {
 	msg, err := c.Conn.ReadMessage()
 	if err != nil {
 		return nil, err
@@ -160,21 +160,21 @@ func (c *EncryptedConn) ReadMessage() (*rpc.RPCMessage, error) {
 	return &decodedMsg, nil
 }
 
-func (c *EncryptedConn) SendMessage(m *rpc.RPCMessage) error {
+func (c *EncryptedConn) SendMessage(m *rpc.Message) error {
 	rawMsg, err := m.Encode()
 	if err != nil {
 		return err
 	}
 	encryptedMsg := c.transportCipher.Seal(nil, make([]byte, c.transportCipher.NonceSize()), rawMsg, nil)
 
-	return c.Conn.SendMessage(&rpc.RPCMessage{Encrypted: &rpc.Encrypted{
+	return c.Conn.SendMessage(&rpc.Message{Encrypted: &rpc.Encrypted{
 		Payload: encryptedMsg,
 	}})
 }
 
 // ReadMessages continuously reads messages from the connection in a goroutine and returns them on a channel
-func (c *EncryptedConn) ReadMessages() (<-chan *rpc.RPCMessage, <-chan error) {
-	resC := make(chan *rpc.RPCMessage)
+func (c *EncryptedConn) ReadMessages() (<-chan *rpc.Message, <-chan error) {
+	resC := make(chan *rpc.Message)
 	errC := make(chan error)
 	go func() {
 		for {
