@@ -14,14 +14,16 @@ type RPCMessage struct {
 	End       bool
 
 	*Handshake
-	*Close
+	*Encrypted
+	*Heartbeat
 }
 
 type Heartbeat struct {
 	Message string
 }
 
-type Close struct {
+type Encrypted struct {
+	Payload []byte
 }
 
 type Handshake struct {
