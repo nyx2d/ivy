@@ -36,6 +36,35 @@ func (m *Manager) handleServerHandshake(p *Peer, msg rpc.RPCMessage) error {
 		return errors.New("peer id mismatch")
 	}
 
+	return m.processHandshake(p, msg)
+}
+
+func (m *Manager) handleClientHandshake(p *Peer, msg rpc.RPCMessage) error {
+	p.ID = msg.Handshake.PeerID
+	log.Tracef("📨 got handshake from %s, %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
+
+	if m.peerActive(p.ID) {
+		// already have peer, drop them
+		log.Errorf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
+		return errors.New("already have peer")
+	}
+
+	err := m.processHandshake(p, msg)
+	if err != nil {
+		return err
+	}
+
+	err = m.addPeer(p)
+	if err != nil {
+		log.Errorf("⛔ add peer err: %v\n", err)
+		return err
+	}
+
+	// now that they're added, send them a handshake back
+	return m.sendHandshake(p)
+}
+
+func (m *Manager) processHandshake(p *Peer, msg rpc.RPCMessage) error {
 	ok := rpc.VerifyHandshake(msg)
 	if !ok {
 		log.Errorf("⛔ handshake verification failed for %s\n", p.Conn.RemoteAddr().String())
@@ -51,45 +80,6 @@ func (m *Manager) handleServerHandshake(p *Peer, msg rpc.RPCMessage) error {
 	log.Tracef("🔐 received transport public key from %s\n", p.Conn.RemoteAddr().String())
 
 	return m.deriveSharedKey(p)
-}
-
-func (m *Manager) handleClientHandshake(p *Peer, msg rpc.RPCMessage) error {
-	p.ID = msg.Handshake.PeerID
-	log.Tracef("📨 got handshake from %s, %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
-
-	if m.peerActive(p.ID) {
-		// already have peer, drop them
-		log.Errorf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
-		return errors.New("already have peer")
-	}
-
-	ok := rpc.VerifyHandshake(msg)
-	if !ok {
-		log.Errorf("⛔ handshake verification failed for %s\n", p.Conn.RemoteAddr().String())
-		return errors.New("handshake verification failed")
-	}
-
-	err := m.addPeer(p)
-	if err != nil {
-		log.Errorf("⛔ add peer err: %v\n", err)
-		return err
-	}
-
-	peerTransportPublicKey, err := ecdh.X25519().NewPublicKey(msg.Handshake.PublicKey)
-	if err != nil {
-		log.Errorf("⛔ invalid transport public key for %s\n", p.Conn.RemoteAddr().String())
-		return err
-	}
-	p.peerTransportPublicKey = peerTransportPublicKey
-	log.Tracef("🔐 received transport public key from %s\n", p.Conn.RemoteAddr().String())
-
-	err = m.deriveSharedKey(p)
-	if err != nil {
-		return err
-	}
-
-	// now that they're added, send them a handshake back
-	return m.sendHandshake(p)
 }
 
 func (m *Manager) deriveSharedKey(p *Peer) error {
