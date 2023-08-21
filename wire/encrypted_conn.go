@@ -91,12 +91,11 @@ func (c *EncryptedConn) HandshakeAsServer(signingKey ed25519.PrivateKey) error {
 }
 
 func (c *EncryptedConn) buildHandshakeMessage(signingKey ed25519.PrivateKey) *rpc.Message {
-	peerID := base64.StdEncoding.EncodeToString(signingKey.Public().(ed25519.PublicKey))
 	sig := ed25519.Sign(signingKey, c.transportPublicKey.Bytes())
 	return &rpc.Message{Handshake: &rpc.Handshake{
-		PeerID:    peerID, // TODO: replace peerID with pubkey directly
-		PublicKey: c.transportPublicKey.Bytes(),
-		Signature: sig,
+		SigningPublicKey:   signingKey.Public().(ed25519.PublicKey),
+		TransportPublicKey: c.transportPublicKey.Bytes(),
+		Signature:          sig,
 	}}
 }
 
@@ -106,19 +105,15 @@ func (c *EncryptedConn) verifyHandshake(m *rpc.Message) bool {
 		return false
 	}
 
-	signingKey, err := base64.StdEncoding.DecodeString(m.Handshake.PeerID) // TODO: replace peerID with pubkey directly
-	if err != nil {
-		return false
-	}
-	peerTransportPublicKey, err := ecdh.X25519().NewPublicKey(m.Handshake.PublicKey)
+	peerTransportPublicKey, err := ecdh.X25519().NewPublicKey(m.Handshake.TransportPublicKey)
 	if err != nil {
 		return false
 	}
 
-	ok := ed25519.Verify(signingKey, m.Handshake.PublicKey, m.Handshake.Signature)
+	ok := ed25519.Verify(m.Handshake.SigningPublicKey, m.Handshake.TransportPublicKey, m.Handshake.Signature)
 	if ok {
 		c.peerTransportPublicKey = peerTransportPublicKey
-		c.peerPublicSigningKey = (*ed25519.PublicKey)(&signingKey)
+		c.peerPublicSigningKey = (*ed25519.PublicKey)(&m.Handshake.SigningPublicKey)
 	}
 	return ok
 }

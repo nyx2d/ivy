@@ -14,9 +14,9 @@ type Encrypted struct {
 }
 
 type Handshake struct {
-	PeerID    string
-	PublicKey []byte
-	Signature []byte
+	SigningPublicKey   []byte
+	TransportPublicKey []byte
+	Signature          []byte // sig of transport_pubkey by signing_pubkey
 }
 
 func (m Message) Encode() ([]byte, error) {
