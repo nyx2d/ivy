@@ -80,9 +80,15 @@ func (m *Manager) peerActive(id string) bool {
 func (m *Manager) removePeer(peer *Peer) {
 	m.peerMutex.Lock()
 	defer m.peerMutex.Unlock()
-	if _, ok := m.peers[peer.ID]; !ok {
+
+	p, ok := m.peers[peer.ID]
+	if !ok {
 		return // just for logging sake
 	}
+	if p.Conn.RemoteAddr().String() != peer.Conn.RemoteAddr().String() {
+		return // we already have a peer with this ID, but it's a different connection
+	}
+
 	delete(m.peers, peer.ID)
 	log.Infof("👋 removed peer %s at %s (%s)\n", peer.ID, peer.Conn.RemoteAddr().String(), peer.TypeIndicator())
 }

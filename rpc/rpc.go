@@ -2,8 +2,10 @@ package rpc
 
 import (
 	"crypto/ed25519"
+	"encoding/base64"
 
 	"github.com/fxamacker/cbor/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 type RPCMessage struct {
@@ -38,12 +40,25 @@ func Decode(raw []byte) (RPCMessage, error) {
 	return m, err
 }
 
-func NewHandshake(peerID string, publicKey []byte, handshakePrivateKey ed25519.PrivateKey) ([]byte, error) {
-	sig := ed25519.Sign(handshakePrivateKey, publicKey)
+func NewHandshake(peerID string, transportPublicKey []byte, signingKey ed25519.PrivateKey) ([]byte, error) {
+	sig := ed25519.Sign(signingKey, transportPublicKey)
 	m := RPCMessage{Handshake: &Handshake{
 		PeerID:    peerID,
-		PublicKey: publicKey,
+		PublicKey: transportPublicKey,
 		Signature: sig,
 	}}
 	return m.Encode()
+}
+
+func VerifyHandshake(m RPCMessage) bool {
+	if m.Handshake == nil {
+		log.Error("⛔ handshake is nil")
+		return false
+	}
+	signingKey, err := base64.StdEncoding.DecodeString(m.Handshake.PeerID)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+	return ed25519.Verify(signingKey, m.Handshake.PublicKey, m.Handshake.Signature)
 }

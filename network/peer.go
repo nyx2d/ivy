@@ -1,6 +1,9 @@
 package network
 
 import (
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/rand"
 	"encoding/binary"
 	"io"
 	"net"
@@ -14,6 +17,17 @@ type Peer struct {
 	Conn net.Conn
 
 	isClient bool // if this peer is a client of ours
+
+	// our temp keys for transport encryption
+	transportPublicKey  *ecdh.PublicKey
+	transportPrivateKey *ecdh.PrivateKey
+
+	// their temp public key for transport encryption
+	peerTransportPublicKey *ecdh.PublicKey
+
+	// our shared secret
+	transportSharedKey []byte
+	transportCipher    cipher.AEAD
 }
 
 // HandleClient takes in an established connection with us as the server
@@ -42,6 +56,16 @@ func (m *Manager) HandlePeer(p *Peer) {
 	m.addConn(p.Conn)
 	defer m.removeConn(p.Conn)
 	defer p.Conn.Close()
+	defer m.removePeer(p) // no-op for non-added peer
+
+	// generate temp public key
+	transportPrivateKey, err := ecdh.X25519().GenerateKey(rand.Reader)
+	if err != nil {
+		log.Errorf("⛔ generate key err: %v\n", err)
+		return
+	}
+	p.transportPrivateKey = transportPrivateKey
+	p.transportPublicKey = transportPrivateKey.PublicKey()
 
 	if !p.isClient {
 		err := m.addPeer(p)
@@ -49,7 +73,6 @@ func (m *Manager) HandlePeer(p *Peer) {
 			log.Errorf("⛔ add peer err: %v\n", err)
 			return
 		}
-		defer m.removePeer(p)
 
 		err = m.sendHandshake(p) // we are the client, let the server know who we are
 		if err != nil {
@@ -72,39 +95,19 @@ func (m *Manager) HandlePeer(p *Peer) {
 		case in := <-readC:
 			msg, err := rpc.Decode(in)
 			if err != nil {
-				log.Fatal(err)
+				log.Errorf("⛔ msg decode err: %v\n", err)
+				return
 			}
 
 			log.Tracef("🔗 message %v from %s (%s)\n", msg, p.Conn.RemoteAddr().String(), p.TypeIndicator())
 
-			if msg.Handshake != nil {
-				// TODO: validate sig, set pubkey
-				p.ID = msg.Handshake.PeerID
-				log.Tracef("📨 got handshake from %s, %s (%s)\n", p.ID, p.Conn.RemoteAddr().String(), p.TypeIndicator())
-
-				if m.peerActive(p.ID) {
-					// already have peer, drop them
-					log.Errorf("⛔ already have peer %s, dropping %s\n", p.ID, p.Conn.RemoteAddr().String())
-					return
-				}
-
-				err := m.addPeer(p)
-				if err != nil {
-					log.Errorf("⛔ add peer err: %v\n", err)
-					return
-				}
-				defer m.removePeer(p)
+			err = m.handleMessage(p, msg)
+			if err != nil {
+				log.Errorf("⛔ handle message err: %v\n", err)
+				return
 			}
 		}
 	}
-}
-
-func (m *Manager) sendHandshake(p *Peer) error {
-	b, err := rpc.NewHandshake(m.peerID, m.publicKey, m.privateKey)
-	if err != nil {
-		return err
-	}
-	return p.sendMessage(b)
 }
 
 func (p *Peer) TypeIndicator() string {
