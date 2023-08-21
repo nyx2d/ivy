@@ -53,12 +53,7 @@ func (m *Manager) FindPeers() {
 						log.Error(err)
 						return
 					}
-
-					err = m.HandleConn(conn, false)
-					if err != nil {
-						log.Errorf("⛔ error connecting to peer: %s\n", err)
-						return
-					}
+					m.HandleConn(conn, false)
 				}()
 			}
 		}

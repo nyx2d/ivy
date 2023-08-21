@@ -28,10 +28,7 @@ func (m *Manager) Serve() error {
 					return
 				}
 
-				err := m.HandleConn(conn, true)
-				if err != nil {
-					log.Fatal(err)
-				}
+				m.HandleConn(conn, true)
 			}()
 		}
 	}()

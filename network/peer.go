@@ -17,12 +17,15 @@ type Peer struct {
 	isClient bool // if this peer is a client of ours
 }
 
-func (m *Manager) HandleConn(c net.Conn, asServer bool) error {
+func (m *Manager) HandleConn(c net.Conn, asServer bool) {
 	m.addConn(c)
+	defer m.removeConn(c)
+	defer c.Close()
+
 	encryptedConn, err := wire.NewEncryptedConn(c)
 	if err != nil {
-		m.removeConn(c)
-		return err
+		log.Error(err)
+		return
 	}
 
 	if asServer {
@@ -31,8 +34,8 @@ func (m *Manager) HandleConn(c net.Conn, asServer bool) error {
 		err = encryptedConn.HandshakeAsClient(m.privateKey)
 	}
 	if err != nil {
-		m.removeConn(c)
-		return err
+		log.Error(err)
+		return
 	}
 
 	// create peer
@@ -43,15 +46,12 @@ func (m *Manager) HandleConn(c net.Conn, asServer bool) error {
 		isClient:      asServer,
 	}
 	m.addPeer(p)
-	go m.HandlePeer(p)
-	return nil
+	defer m.removePeer(p)
+
+	m.HandlePeer(p)
 }
 
 func (m *Manager) HandlePeer(p *Peer) {
-	defer m.removeConn(p.Conn)
-	defer p.Conn.Close()
-	defer m.removePeer(p)
-
 	readC, readErrC := p.EncryptedConn.ReadMessages()
 	for {
 		select {
