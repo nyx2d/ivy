@@ -45,6 +45,8 @@ func (m *Manager) HandleConn(c net.Conn, asServer bool) {
 		EncryptedConn: encryptedConn,
 		isClient:      asServer,
 	}
+	log.Infof("🔓 completed handshake with peer %s\n", p.ID)
+
 	m.addPeer(p)
 	defer m.removePeer(p)
 

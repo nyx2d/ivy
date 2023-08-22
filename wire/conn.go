@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
-
-	"github.com/nyx2d/ivy/rpc"
 )
 
 type Conn struct {
@@ -17,7 +15,7 @@ func NewConn(conn net.Conn) *Conn {
 }
 
 // ReadMessage blocks until a full message is read and decodes it into an RPCMessage
-func (c *Conn) ReadMessage() (*rpc.Message, error) {
+func (c *Conn) ReadMessage() (*Message, error) {
 	sizeBuf := make([]byte, 8)
 	_, err := io.ReadFull(c.conn, sizeBuf)
 	if err != nil {
@@ -31,14 +29,14 @@ func (c *Conn) ReadMessage() (*rpc.Message, error) {
 		return nil, err
 	}
 
-	msg, err := rpc.Decode(readBuf)
+	msg, err := Decode(readBuf)
 	if err != nil {
 		return nil, err
 	}
 	return &msg, nil
 }
 
-func (c *Conn) SendMessage(m *rpc.Message) error {
+func (c *Conn) SendMessage(m *Message) error {
 	data, err := m.Encode()
 	if err != nil {
 		return err

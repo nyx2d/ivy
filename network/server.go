@@ -13,7 +13,7 @@ func (m *Manager) Serve() error {
 	}
 	m.serverAddr = lis.Addr().(*net.TCPAddr)
 
-	log.Infof("👂 server listening at %v", lis.Addr().String())
+	log.Infof("🌱 server listening at %v", lis.Addr().String())
 	go func() {
 		for {
 			conn, err := lis.Accept()

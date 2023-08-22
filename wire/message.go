@@ -1,4 +1,4 @@
-package rpc
+package wire
 
 import (
 	"github.com/fxamacker/cbor/v2"
